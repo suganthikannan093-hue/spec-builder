@@ -16,6 +16,7 @@ import { AgentNativeIcon } from "@agent-native/toolkit/app/shared/AgentNativeIco
 import {
   IconEdit,
   IconHome,
+  IconFileDescription,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
   IconLoader2,
@@ -115,6 +116,28 @@ function persistActiveThreadId(threadId: string) {
   try {
     localStorage.setItem(CHAT_ACTIVE_THREAD_KEY, threadId);
   } catch {}
+}
+
+function SpecNavLink({ collapsed }: { collapsed: boolean }) {
+  const location = useLocation();
+  const active = location.pathname === "/spec";
+  return (
+    <div className={collapsed ? undefined : "px-2"}>
+      <Link
+        to="/spec"
+        aria-current={active ? "page" : undefined}
+        aria-label={collapsed ? "Spec Builder" : undefined}
+        className={cn(
+          "flex items-center text-sidebar-accent-foreground transition-colors hover:bg-sidebar-accent",
+          active && "bg-sidebar-accent",
+          collapsed ? "size-8 justify-center rounded-md" : "h-8 w-full gap-3 rounded-lg px-3 text-sm font-medium",
+        )}
+      >
+        <IconFileDescription className="size-4 shrink-0" strokeWidth={1.8} />
+        <span className={collapsed ? "sr-only" : "truncate"}>Spec Builder</span>
+      </Link>
+    </div>
+  );
 }
 
 function HomeNavLink({ collapsed }: { collapsed: boolean }) {
@@ -408,6 +431,7 @@ export function Sidebar({
         )}
       >
         <HomeNavLink collapsed={collapsed} />
+        <SpecNavLink collapsed={collapsed} />
         <ChatThreadsSection collapsed={collapsed} />
       </nav>
 

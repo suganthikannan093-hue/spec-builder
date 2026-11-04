@@ -1,0 +1,15 @@
+Spec Builder demo narration (voice: OpenAI tts-1 "nova")
+
+[0:00] Spec Builder. Turn a rough idea into a spec you and an agent build together.
+
+[0:05] Specs usually start as a messy idea in someone's notes. Spec Builder is an agent-native app where you and an AI agent shape that idea together, on the same data, through the same actions.
+
+[0:17] I paste a rough idea for an on-call incident app and click Generate spec. In a few seconds, real G P T 4 o mini drafts six sections: problem, target users, solution, key features, implementation steps, and risks. Every card shows who wrote it and which model.
+
+[0:34] I can override anything. Here I edit Target Users inline and save. The badge flips to written by you, version two, so my edits are never silently overwritten.
+
+[0:44] Now I open the agent chat and ask it to tighten the Risks section and add a pricing open question. The agent calls the exact same update-section action my buttons use. There's no separate API. Watch the Risks card update live while it works.
+
+[1:03] The activity log shows every step, from the UI or from the agent chat, and the action it called. One define-action, shared by the UI, the agent, HTTP, M C P and the CLI. That's agent-native.
+
+[1:15] Spec Builder, built with Agent-Native. Thanks for watching.
