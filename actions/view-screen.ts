@@ -1,6 +1,7 @@
 import { defineAction } from "@agent-native/core/action";
 import { readAppState } from "@agent-native/core/application-state";
 import { z } from "zod";
+import { readSelection } from "../server/lib/selection.js";
 
 export default defineAction({
   description:
@@ -13,6 +14,8 @@ export default defineAction({
 
     const screen: Record<string, unknown> = {};
     if (navigation) screen.navigation = navigation;
+    const selected = await readSelection();
+    if (selected) screen.selectedSpecCard = selected;
 
     if (Object.keys(screen).length === 0) {
       return "No application state found. Is the app running?";

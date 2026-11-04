@@ -44,28 +44,36 @@ There are no other mandatory tools. Any LLM provider is allowed, and registratio
 - **New during the hackathon (3 Nov 2026 onward):**
   - Spec domain model and storage in `server/lib/spec.ts`. It uses the framework's SQL settings store and keeps a per-section version, author and source, plus an activity log.
   - The LLM layer (OpenAI or Anthropic with JSON output), a deterministic offline mock, and an honest record of where every piece of content came from.
-  - Seven actions: `generate-spec`, `update-section` (feedback that can touch related sections), `edit-section`, `regenerate-section`, `get-spec`, `new-spec` and `list-specs`.
+  - Eleven actions: `generate-spec`, `update-section` (feedback that can touch related sections), `edit-section`, `regenerate-section`, `get-spec`, `new-spec`, `list-specs`, `review-spec`, `resolve-suggestion`, `export-spec` and `undo-section`.
+  - Selected-card awareness: the page writes the selected card into application-state (`spec-selection`, tab-scoped), and `get-spec`, `view-screen` and the section actions use it, so "make this more specific" targets that card.
+  - Spec review: structured suggestions (gap, ambiguity, acceptance criteria) with Accept / Reject and a diff preview.
+  - Export: SPEC.md and a TASKS.md checklist, from chat or a button (`/api/spec-export` serves the file download).
+  - Per-card history (last 10 versions), a line diff view and Undo.
   - A new `/spec` page with editable cards, feedback on each card, source and author badges, live refresh, change highlights, and an activity log showing the UI or agent and the action it called.
   - Agent system prompt and first-turn tools, the sidebar link and nav view, the home path, the README and this file.
 
 ## Submission description (draft)
 
-> **Collaborative Spec & Plan Builder** turns a rough product idea into a structured, editable spec covering problem, target users, proposed solution, key features, implementation steps, and risks and open questions. You and an AI agent work on the same document. You can edit any card directly, type feedback on one card so the agent rewrites only that section (and fixes related sections when the change makes them inconsistent), regenerate a single section, or just ask in chat ("tighten the risks section", "make this a 2-week MVP").
+> **Collaborative Spec & Plan Builder** turns a rough product idea into a structured, editable spec covering problem, target users, proposed solution, key features, implementation steps, and risks and open questions. You and an AI agent work on the same document. You can edit any card directly, type feedback on one card so the agent rewrites only that section (and fixes related sections when the change makes them inconsistent), regenerate a single section, or just ask in chat ("tighten the risks section", "make this a 2-week MVP"). Click a card and the agent knows what "this" means. Ask for a review and the agent returns typed suggestions (gaps, ambiguity, missing acceptance criteria) that you Accept or Reject. Every edit keeps its previous version with a diff and one-click Undo, and the finished spec exports as SPEC.md plus a task checklist.
 >
 > It's built the agent-native way: every capability is one `defineAction` shared by the React UI, the in-app agent, HTTP, MCP and the CLI, and both sides read and write the same SQL-backed spec. The page refreshes live when the agent acts. Each card shows who changed it (you or the agent), its version and which model wrote it. An activity log shows every step as "UI → update-section" or "Agent chat → update-section", so the collaboration is visible and the human always has the last word.
 >
 > Pre-existing work: the Agent-Native `chat` starter template and open-source libraries. Everything spec-related was built during the hackathon (see HACKATHON.md).
 
-## 2-minute demo script, mapped to the judging criteria
+## 2:30 demo script, mapped to the judging criteria
 
 | Time | On screen | Say | Criterion |
 |---|---|---|---|
-| 0:00–0:12 | `/spec` hero and the three-box strip "You · Shared actions · Agent" | "Specs start as messy ideas. Here you and an agent shape one together, on the same data, through the same actions." | Usefulness and Execution (40) |
-| 0:12–0:35 | Paste the idea, click **Generate spec**. Six colour-coded cards appear with the badge `agent · v1 · openai · gpt-4o-mini` | "One click gives a full spec. Every card says who wrote it and which model." | Usefulness and Execution (40), Creativity and Design (20) |
-| 0:35–0:58 | On Key Features, type "add Slack one-click acknowledge" and click **Update**. Key Features and Implementation Steps both glow | "Feedback is targeted. The agent rewrote this card and kept the plan consistent." | Innovation (20) |
-| 0:58–1:15 | Edit Target Users inline and **Save**. The badge turns `user · v2 · written by you`, and the log shows `UI → edit-section` | "I can override anything, and my edits are never silently overwritten." | Innovation (20), Usefulness and Execution (40) |
-| 1:15–1:45 | Open the agent chat and type "Tighten the Risks section and add a pricing open question". The Risks card updates live, and the log shows `Agent chat → update-section` | "The chat agent calls the exact same actions as my buttons, with no separate API. The UI updates as it works." | Cleverness and Use of Agent-Native (20) |
-| 1:45–2:00 | Show the activity log, then `actions/update-section.ts` | "One `defineAction`, used by the UI, the agent, HTTP, MCP and the CLI. That's agent-native." | Cleverness and Use of Agent-Native (20), Creativity and Design (20) |
+| 0:00–0:10 | `/spec` hero and the strip "You · Shared actions · Agent" | "Specs start as messy ideas. Here you and an agent shape one together, on the same data, through the same actions." | Usefulness and Execution (40) |
+| 0:10–0:28 | Paste the idea, click **Generate spec**. Six cards appear with `agent · v1 · openai · gpt-4o-mini` | "One click gives a full spec. Every card says who wrote it and which model." | Usefulness and Execution (40), Creativity and Design (20) |
+| 0:28–0:50 | Click the **Key Features** card. It gets a blue ring, the chip "Selected · agent sees this" and the bar "Agent focus: 04 Key Features". Click **Make this more specific** (or type it in chat) | "I never say which card. The UI writes my selection into application-state, and the agent reads it, so 'this' just works." | Use of Agent-Native (20), Innovation (20) |
+| 0:50–1:05 | The card updates live. Click the **History** icon: a red/green diff shows exactly what the agent changed, then click **Undo** | "Every agent or human edit keeps the previous version. I can see the diff and undo it in one click. The agent can call the same undo-section action." | Usefulness and Execution (40), Innovation (20) |
+| 1:05–1:40 | Click **Review spec**. A panel lists typed suggestions (gap, ambiguity, acceptance-criteria) with orange "1 review" chips on the affected cards. Click **Preview change** on one, **Accept** it, **Reject** another | "The agent critiques its own spec like a tough reviewer, but it only proposes. I decide, and an accepted fix goes into history so it's undoable." | Innovation (20), Creativity and Design (20) |
+| 1:40–2:00 | In chat: "Export the spec as SPEC.md with the task list". The agent replies with download links. Then click the **SPEC.md** button and open the file | "SPEC.md plus a checklist ready to paste into a repo or tracker, from chat or a button: same export-spec action." | Usefulness and Execution (40), Use of Agent-Native (20) |
+| 2:00–2:15 | Edit Target Users inline and **Save**. The badge turns `user · v2 · written by you` | "I can override anything, and my edits are never silently overwritten." | Usefulness and Execution (40) |
+| 2:15–2:30 | Show the activity log (`UI → resolve-suggestion`, `Agent chat → update-section`, `Agent chat → export-spec`), then `actions/review-spec.ts` | "Eleven defineActions shared by the UI, the agent, HTTP, MCP and the CLI, plus shared application-state. That's agent-native." | Use of Agent-Native (20) |
+
+Tip: before recording, click **New spec** so history and review start empty. Screenshots of each feature: `docs/feature-*.png`.
 
 ## Deployment (optional, not done)
 

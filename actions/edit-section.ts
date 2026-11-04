@@ -1,6 +1,6 @@
 import { defineAction } from "@agent-native/core/action";
 import { z } from "zod";
-import { loadSpec, requireSection, saveSpec, type SectionKey } from "../server/lib/spec.js";
+import { applySectionChange, loadSpec, saveSpec, type SectionKey } from "../server/lib/spec.js";
 
 export default defineAction({
   description: "Directly replace the content (Markdown) of one section of the current spec. Used by the UI for inline user edits. Agent: use this ONLY when the user dictates exact verbatim text; for any rewrite/tighten/improve request call update-section instead.",
@@ -15,9 +15,8 @@ export default defineAction({
     const via: "ui" | "agent" = ctx?.caller === "tool" || ctx?.caller === "mcp" || ctx?.caller === "a2a" ? "agent" : viaArg;
     const spec = await loadSpec();
     if (!spec) throw new Error("No spec yet. Call generate-spec first.");
-    const s = requireSection(spec, section as SectionKey);
     const now = new Date().toISOString();
-    s.content = content; s.updatedBy = actor; s.updatedAt = now; s.version += 1; s.source = actor === "user" ? "user" : "agent (verbatim)";
+    applySectionChange(spec, section as SectionKey, { content, updatedBy: actor, source: actor === "user" ? "user" : "agent (verbatim)", action: "edit-section" });
     spec.activity.push({ via, at: now, actor, action: "edited", section: section as SectionKey });
     await saveSpec(spec);
     return { id: spec.id, message: `Saved ${section}`, spec };

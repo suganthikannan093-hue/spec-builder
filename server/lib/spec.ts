@@ -27,14 +27,37 @@ export interface Section {
   updatedAt: string;
   version: number;
   /** Where the content came from: "openai:<model>", "anthropic:<model>", "mock", "mock (fallback: …)" or "user". */
-  source?: string;
+  source?: string | undefined;
+  /** Previous versions, oldest first (max 10). Undo pops the last one. */
+  history?: HistoryEntry[];
 }
+export interface HistoryEntry {
+  content: string;
+  updatedBy: "agent" | "user";
+  version: number;
+  source?: string | undefined;
+  at: string;
+  /** The change that replaced this version, e.g. "update-section". */
+  replacedBy: string;
+}
+export type SuggestionType = "gap" | "ambiguity" | "acceptance-criteria";
+export interface Suggestion {
+  id: string;
+  section: SectionKey;
+  type: SuggestionType;
+  issue: string;
+  suggestion: string;
+  proposedContent: string;
+  baseVersion: number;
+  status: "pending" | "accepted" | "rejected";
+}
+export interface Review { at: string; source: string; via?: string; suggestions: Suggestion[] }
 export let lastLlmError: string | null = null;
 export interface ActivityEntry {
   at: string;
   actor: "agent" | "user";
   action: string;
-  section?: SectionKey;
+  section?: SectionKey | undefined;
   note?: string;
   source?: string;
   via?: string;
@@ -46,6 +69,7 @@ export interface Spec {
   provider: string;
   sections: Section[];
   activity: ActivityEntry[];
+  review?: Review | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -77,6 +101,41 @@ export function requireSection(spec: Spec, key: SectionKey): Section {
   const s = spec.sections.find((x) => x.key === key);
   if (!s) throw new Error(`Unknown section ${key}`);
   return s;
+}
+
+export const MAX_HISTORY = 10;
+
+/** Every content change goes through here so the previous version is kept for diff + undo. */
+export function applySectionChange(
+  spec: Spec,
+  key: SectionKey,
+  change: { content: string; updatedBy: "agent" | "user"; source?: string; action: string },
+): Section {
+  const s = requireSection(spec, key);
+  if (s.content === change.content) return s;
+  s.history = [
+    ...(s.history ?? []),
+    { content: s.content, updatedBy: s.updatedBy, version: s.version, source: s.source, at: s.updatedAt, replacedBy: change.action },
+  ].slice(-MAX_HISTORY);
+  s.content = change.content;
+  s.updatedBy = change.updatedBy;
+  s.updatedAt = new Date().toISOString();
+  s.version += 1;
+  s.source = change.source;
+  return s;
+}
+
+/** Revert the last change of a section. Version keeps increasing so live views notice. */
+export function undoSectionChange(spec: Spec, key: SectionKey): { section: Section; undone: HistoryEntry } {
+  const s = requireSection(spec, key);
+  const prev = s.history?.pop();
+  if (!prev) throw new Error(`Nothing to undo on ${key}`);
+  s.content = prev.content;
+  s.updatedBy = prev.updatedBy;
+  s.source = prev.source;
+  s.updatedAt = new Date().toISOString();
+  s.version += 1;
+  return { section: s, undone: prev };
 }
 
 // ---------------- LLM layer ----------------
@@ -217,6 +276,70 @@ export async function reviseSection(
     return { content, related, source: providerName() };
   }
   return { ...mockRevise(spec, key, feedback, allowRelated), source: mockSource() };
+}
+
+const TYPES: SuggestionType[] = ["gap", "ambiguity", "acceptance-criteria"];
+
+export async function reviewSections(
+  spec: Spec,
+  only?: SectionKey,
+): Promise<{ suggestions: Omit<Suggestion, "id" | "status" | "baseVersion">[]; source: string }> {
+  const ctx = spec.sections.map((s) => `## ${s.title} (${s.key})\n${s.content}`).join("\n\n");
+  const out = parseJson(
+    await callLLM(
+      SYSTEM,
+      `Critically review this spec for "${spec.title}" like a tough staff-engineer reviewer.\n\n${ctx}\n\nFind the ${only ? "2-3" : "3-5"} most valuable problems${only ? ` in the section "${only}" only` : ""}: gaps (missing things a team needs), ambiguity (vague words, unmeasurable goals), and missing acceptance criteria (features without testable done-conditions). For each, write a fix as "proposedContent": the ENTIRE new section in Markdown, i.e. every existing line of that section kept verbatim unless the fix changes it, plus your additions (never drop existing items, no heading).\nReturn JSON {"suggestions":[{"section": one of ${SECTION_KEYS.join("|")}, "type": "gap"|"ambiguity"|"acceptance-criteria", "issue": one sentence, "suggestion": one sentence describing the fix, "proposedContent": markdown}]}.`,
+    ),
+  );
+  if (out && Array.isArray(out.suggestions)) {
+    const suggestions = out.suggestions
+      .filter((x: any) => x && SECTION_KEYS.includes(x.section) && typeof x.proposedContent === "string" && typeof x.issue === "string")
+      .filter((x: any) => !only || x.section === only)
+      .slice(0, 6)
+      .map((x: any) => ({
+        section: x.section as SectionKey,
+        type: (TYPES.includes(x.type) ? x.type : "gap") as SuggestionType,
+        issue: String(x.issue),
+        suggestion: String(x.suggestion ?? ""),
+        proposedContent: keepExisting(requireSection(spec, x.section).content, String(x.proposedContent).replace(/^\s*#{1,6}\s+[^\n]*\n+/, "").trim()),
+      }));
+    if (suggestions.length) return { suggestions, source: providerName() };
+  }
+  return { suggestions: mockReview(spec, only), source: mockSource() };
+}
+
+/** Guard: if the model returned only the new lines (much shorter than the card), append them instead of wiping the card. */
+export function keepExisting(current: string, proposed: string): string {
+  if (proposed.length < current.length * 0.6 && !proposed.includes(current.slice(0, 40))) return `${current.trim()}\n${proposed}`;
+  return proposed;
+}
+
+export function mockReview(spec: Spec, only?: SectionKey): Omit<Suggestion, "id" | "status" | "baseVersion">[] {
+  const c = (k: SectionKey) => requireSection(spec, k).content;
+  const all: Omit<Suggestion, "id" | "status" | "baseVersion">[] = [
+    {
+      section: "keyFeatures",
+      type: "acceptance-criteria",
+      issue: "Features have no testable done-conditions.",
+      suggestion: "Add acceptance criteria so QA knows when each feature is finished.",
+      proposedContent: `${c("keyFeatures")}\n\n**Acceptance criteria**\n- Each feature has a demoable happy path and one error state.\n- Core flows complete in under 3 taps/clicks.`,
+    },
+    {
+      section: "targetUsers",
+      type: "ambiguity",
+      issue: "\"Small teams\" is not measurable.",
+      suggestion: "Define the team size and the first segment to win.",
+      proposedContent: `${c("targetUsers")}\n- **Beachhead (v1):** teams of 2-10 people.`,
+    },
+    {
+      section: "risks",
+      type: "gap",
+      issue: "No success metric to judge the launch.",
+      suggestion: "Add a measurable success metric and a kill criterion.",
+      proposedContent: `${c("risks")}\n- **Success metric:** 40% of beta users active weekly after 4 weeks; otherwise revisit scope.`,
+    },
+  ];
+  return only ? all.filter((x) => x.section === only).concat(only && !all.some((x) => x.section === only) ? [{ section: only, type: "ambiguity", issue: "This section has no measurable statement.", suggestion: "Add one concrete, measurable line.", proposedContent: `${c(only)}\n- **Measurable:** define a number we can check after launch.` }] : []) : all;
 }
 
 // ---------------- Deterministic offline mock ----------------
