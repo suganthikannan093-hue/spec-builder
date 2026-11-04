@@ -60,6 +60,29 @@ There are no other mandatory tools. Any LLM provider is allowed, and registratio
 >
 > Pre-existing work: the Agent-Native `chat` starter template and open-source libraries. Everything spec-related was built during the hackathon (see HACKATHON.md).
 
+## Ready-to-paste submission form text
+
+**Project name:** Collaborative Spec & Plan Builder (Spec Builder)
+
+**Tagline:** Turn a rough idea into a reviewable spec that you and an AI agent build together: same data, same actions, and you have the last word.
+
+**Description:**
+Spec Builder turns a rough product idea into a structured, editable spec with six cards: Problem, Target Users, Proposed Solution, Key Features, Implementation Steps, and Risks & Open Questions. You and an AI agent (OpenAI gpt-4o-mini) work on the same document. Edit any card inline, give feedback on one card so the agent rewrites only that section (and keeps related ones consistent), or just talk to the agent in chat. Click a card and say "make this more specific": the agent knows what "this" means. Ask for a review and the agent returns typed suggestions (gaps, ambiguity, missing acceptance criteria) that you preview as a diff and Accept or Reject. Every card keeps its last 10 versions with a diff and one-click Undo, and the finished spec exports as SPEC.md plus a task checklist, from a button or from chat. Each card shows who changed it, its version and which model wrote it, and an activity log shows every step as "UI → action" or "Agent chat → action".
+
+**How Agent-Native is used:**
+- Eleven `defineAction`s (generate-spec, update-section, edit-section, regenerate-section, review-spec, resolve-suggestion, undo-section, export-spec, get-spec, new-spec, list-specs) are the single source of truth. The same action is an agent tool, a React hook, an HTTP endpoint, an MCP tool and a CLI command, so the UI and the agent are equal collaborators.
+- Application-state: the page writes the selected card to `spec-selection` (tab-scoped). get-spec, view-screen and the section actions read it, so the agent sees what the user is looking at.
+- Shared SQL-backed data with live sync: agent tool calls invalidate the page's queries, so cards update and glow while the agent works.
+- Human in control: the agent proposes, the human accepts or rejects; every edit is attributed, versioned and undoable.
+
+**Pre-existing work:** Built on the Agent-Native `chat` starter template (`@agent-native/core` 0.223.0) and open-source libraries (React, React Router, TanStack Query, Tailwind, Zod, Vercel AI SDK). Everything spec-related (domain model, LLM layer, all spec actions, the /spec UI, selection, review, history/undo and export) was built during the hackathon from 3 Nov 2026.
+
+**Repo URL:** https://github.com/suganthikannan093-hue/spec-builder (make public before submitting)
+
+**Demo (Clips) URL:** _paste the public Clips link_
+
+A narrated 2:22 demo (1280×720) following the script below is at `docs/demo.mp4`; narration text in `docs/narration.txt`.
+
 ## 2:30 demo script, mapped to the judging criteria
 
 | Time | On screen | Say | Criterion |

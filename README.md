@@ -1,73 +1,111 @@
 # Collaborative Spec & Plan Builder (spec-builder)
 
-An **Agent-Native** app for the Builder.io Agent-Native Hackathon. You paste a rough product or feature idea, and an AI agent turns it into a structured spec with six editable sections:
+> **Turn a rough idea into a structured, reviewable spec that you and an AI agent build together: same data, same actions, and the human always has the last word.**
 
-**Problem · Target Users · Proposed Solution · Key Features · Implementation Steps · Risks & Open Questions**
+Built with the [Agent-Native](https://www.agent-native.com/docs/) framework for the Builder.io Agent-Native Hackathon.
 
-You stay in control. You can edit any card inline, give feedback on one card (the agent rewrites only that section and, if needed, makes small fixes to related sections), regenerate a single card, or drive everything from the agent chat. The UI and the agent call **the same actions** on **the same data**, so every change shows up live on both sides, with an `agent` or `user` badge, a version number and an activity log.
+🎬 **Demo video:** _[Clips link, added at submission]_ · local copy: [`docs/demo.mp4`](docs/demo.mp4) (2:22)
 
-![screenshot](docs/screenshot.png)
+![Spec Builder: selected card, live agent chat and spec cards](docs/feature-chat-selected.png)
 
-## Run it
+## Why
 
-```bash
-pnpm install          # if node-pty fails to compile: pnpm install --config.ignore-scripts=true
-cp .env.example .env  # AUTH_DISABLED=true skips login for local demos
-pnpm dev              # opens http://localhost:8080 → go to /spec ("Spec Builder" in the sidebar)
-```
+Specs start as a messy idea in someone's notes. Chat assistants can draft one, but the result lives in a chat transcript you can't edit, review or trust. Spec Builder puts the spec in a real UI. The agent and the human edit the **same document through the same actions**, and every change is attributed, versioned and undoable.
 
-Other commands: `pnpm typecheck`, `pnpm build`, and `pnpm agent-native:doctor`.
+## Features
 
-### LLM keys (optional)
-| Variable | Effect |
-|---|---|
-| `OPENAI_API_KEY` (+ `OPENAI_MODEL`, default `gpt-4o-mini`) | Spec actions use OpenAI with JSON output |
-| `ANTHROPIC_API_KEY` (+ `ANTHROPIC_MODEL`) | Used if no OpenAI key is set |
-| neither | A **deterministic offline mock** generator, so the demo always works |
+| | Feature | What it does |
+|---|---|---|
+| ✨ | **Idea → spec** | One click turns an idea into six cards: Problem · Target Users · Proposed Solution · Key Features · Implementation Steps · Risks & Open Questions |
+| ✏️ | **Edit, feedback, regenerate** | Edit any card inline, give feedback on one card (the agent rewrites it and keeps related cards consistent), or regenerate a single card |
+| 🎯 | **Selected-card awareness** *(new)* | Click a card: the selection is written to application-state, so "make this more specific" in chat just works without naming the card |
+| 🧐 | **Spec review with Accept / Reject** *(new)* | The agent returns typed suggestions (gap, ambiguity, acceptance criteria). Preview the exact diff, then Accept or Reject each one |
+| 🕘 | **Per-card history, diff and Undo** *(new)* | Each card keeps its last 10 versions, shows a red/green diff of what changed and who changed it, and restores in one click |
+| 📄 | **Export SPEC.md + task list** *(new)* | Download SPEC.md and a TASKS.md checklist from a button or by asking the agent in chat |
+| 🏷️ | **Honest provenance** | Every card shows `agent`/`user`, its version and its real source (`openai · gpt-4o-mini`, `offline mock` or `written by you`) |
+| 📜 | **Activity log** | Every step shows as `UI → action` or `Agent chat → action` |
 
-The badge in the header shows the provider in use (for example `Live · mock (offline)`). If an LLM call fails, the actions fall back to the mock. The chat agent itself uses whatever model you configure in the app's agent settings.
+| Selection | Review | Diff & Undo | Export from chat |
+|---|---|---|---|
+| ![](docs/feature-selection.png) | ![](docs/feature-review.png) | ![](docs/feature-diff.png) | ![](docs/feature-chat-export.png) |
+
+## How it uses Agent-Native
+
+- **Actions are the single source of truth.** Every capability is one `defineAction` in `actions/`. The same action is an agent tool, a React hook (`useActionQuery` / `useActionMutation`), an HTTP endpoint (`/_agent-native/actions/<name>`), an MCP tool and a CLI command (`pnpm action get-spec`).
+- **Application-state lets the agent see the UI.** The `/spec` page writes the selected card to application-state (`spec-selection`, tab-scoped). `get-spec`, `view-screen` and the section actions read it, so "this" resolves to what you're looking at.
+- **Shared data, live sync.** The UI and the agent read and write the same SQL-backed spec record. Agent tool calls invalidate the page's queries, so cards update and glow live while the agent works.
+- **The human stays in control.** The agent proposes (review suggestions) and the human decides. Every edit is versioned and undoable, and the agent is told never to overwrite user edits it wasn't asked to change.
 
 ## Architecture
 
+```mermaid
+flowchart LR
+  U[You<br/>/spec page] -->|useActionMutation| A
+  C[Agent chat<br/>gpt-4o-mini] -->|tool calls| A
+  X[HTTP · MCP · CLI] --> A
+  U -- selected card --> S[(application-state<br/>spec-selection)]
+  S -- what 'this' means --> C
+  subgraph A[Shared defineActions]
+    G[generate-spec] --- UP[update-section] --- E[edit-section] --- R[regenerate-section]
+    RV[review-spec] --- RS[resolve-suggestion] --- UN[undo-section] --- EX[export-spec]
+    GS[get-spec] --- NS[new-spec] --- LS[list-specs]
+  end
+  A --> D[(SQL settings store<br/>spec, history, review, activity)]
+  A --> L[LLM layer<br/>OpenAI / Anthropic / offline mock]
+  D -->|live refresh| U
 ```
-actions/                    ← single source of truth (agent tools + UI hooks + HTTP + CLI)
-  generate-spec.ts          idea → 6 sections (replaces current spec)
-  update-section.ts         feedback → rewrite one section (+ optional related sections)
-  edit-section.ts           direct inline edit (actor: user|agent)
-  regenerate-section.ts     fresh draft of one section from the original idea
-  get-spec.ts               read current spec (GET)
-  new-spec.ts               clear current spec
-  list-specs.ts             list / reopen earlier specs
-server/lib/spec.ts          data model, persistence (framework settings store, SQL), LLM + mock
-server/plugins/agent-chat.ts  agent system prompt + spec tools loaded on the first turn
-app/routes/spec.tsx         UI: idea input, 6 editable cards, per-card feedback, activity log
+
+```
+actions/                      single source of truth (agent tools + UI hooks + HTTP + MCP + CLI)
+  generate-spec.ts            idea → 6 sections
+  update-section.ts           feedback → rewrite one section (+ related sections)
+  edit-section.ts             direct inline edit (actor: user | agent)
+  regenerate-section.ts       fresh draft of one section
+  review-spec.ts              typed review suggestions with proposed content
+  resolve-suggestion.ts       accept / reject a suggestion
+  undo-section.ts             restore the previous version of a card
+  export-spec.ts              SPEC.md + TASKS.md
+  get-spec.ts · new-spec.ts · list-specs.ts
+server/lib/spec.ts            data model, history, persistence, LLM + mock
+server/plugins/agent-chat.ts  agent system prompt + first-turn tools
+app/routes/spec.tsx           UI: cards, selection, review panel, diff, export, activity log
 ```
 
-- **Shared actions:** each `defineAction` is exposed as an agent tool, as `POST/GET /_agent-native/actions/<name>`, to the React page via `useActionQuery`/`useActionMutation`, and to the CLI (`pnpm action get-spec`).
-- **Shared state:** the spec is saved in the framework's SQL-backed settings store (`spec-builder:current`, plus an archive per spec), so the agent, the UI and the CLI read and write the same record.
-- **Live updates:** mutating actions refresh action queries automatically, the chat run stream invalidates queries after each agent tool call, and the page also polls `get-spec` every 2 s so changes made from the CLI or HTTP appear too. Changed cards briefly glow.
-- **User control:** agent edits are attributed and versioned, user edits win (the agent is told to call `get-spec` first and never overwrite edits it wasn't asked to change), and every agent action is something the user can also do with a button.
+## Setup and run
 
+Requires Node.js 20+ and pnpm.
 
-**Source labels:** keys are read from the process environment or from `.env`. Every card shows its real source: `openai · gpt-4o-mini`, `offline mock`, `offline mock (LLM unavailable)` or `written by you`. The header warns when the configured LLM is failing (for example an exhausted quota).
+```bash
+pnpm install          # if node-pty fails to compile: pnpm install --config.ignore-scripts=true
+cp .env.example .env  # then add your key; AUTH_DISABLED=true skips login for local demos
+AGENT_ENGINE=ai-sdk:openai pnpm dev   # http://localhost:8080 → "Spec Builder" (/spec)
+```
 
-### Chat agent on OpenAI
-The in-app chat agent uses the framework engine `ai-sdk:openai`, which reads the same `OPENAI_API_KEY`. Start with `AGENT_ENGINE=ai-sdk:openai pnpm dev`, or set it via Settings → Model or the `manage-agent-engine` action (`{"action":"set","engine":"ai-sdk:openai","model":"gpt-4o-mini"}`). Then ask in chat: "Tighten the Risks section."
+Checks: `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm agent-native:doctor`.
 
-**Visible collaboration:** every action records `via` (`ui` or `agent`), and the activity log shows lines like `UI → edit-section` and `Agent chat → update-section`.
+The chat agent's model can also be set in Settings → Model. Then try: click a card → "Make this more specific", or "Export the spec as SPEC.md with the task list".
 
-See **HACKATHON.md** for the rules checklist, disclosure, submission text and demo script.
+### Environment variables (names only)
 
-## 2-minute demo script
+| Variable | Purpose |
+|---|---|
+| `OPENAI_API_KEY` | Spec actions and the chat agent use OpenAI |
+| `OPENAI_MODEL` | Optional, default `gpt-4o-mini` |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Used if no OpenAI key is set |
+| `AGENT_ENGINE` | Chat engine, e.g. `ai-sdk:openai` |
+| `AUTH_DISABLED` | `true` for local demos only |
+| `DATABASE_URL`, `BETTER_AUTH_SECRET` | Production deployments only (local dev uses embedded PGlite) |
 
-1. **(0:00) Intro.** "Rough ideas become structured specs, with an agent and a human editing the same document."
-2. **(0:15) Generate.** Open `/spec`, click *Use example idea*, then **Generate spec**. Six cards appear, each tagged `agent · v1`.
-3. **(0:40) Targeted feedback.** On *Key Features* type "add in-app chat between borrower and lender" and click **Update**. Key Features *and* Implementation Steps glow, because the agent kept the related section consistent, and the toast says which sections changed.
-4. **(1:05) Direct control.** Click ✏️ on *Problem*, edit the text, then **Save**. The badge turns `user · v2`, and the activity log shows `user edited`.
-5. **(1:25) Agent from chat.** Click **Ask the agent** (or open the side chat) and say: "Tighten the risks section and add a pricing open question." Watch the *Risks* card update live while the chat explains what changed.
-6. **(1:50) Close.** "One set of actions and one data model, so the agent and the UI are equal collaborators, and the human always has the last word."
+With no LLM key, a deterministic **offline mock** keeps the app usable, and every card is labelled `offline mock`.
 
 ## Limitations
-- There's one shared "current spec" per app database, which suits a single-user demo. It isn't yet scoped per user or org.
-- The offline mock is template-based. Use a real key for high-quality specs.
-- Production keys should go through `resolveCredential` instead of `.env` (see the comment in `server/lib/spec.ts`).
+
+- One shared "current spec" per database (fine for a single-user demo; not yet scoped per user or org).
+- The offline mock is template-based; use a real key for good specs.
+- Production keys should go through `resolveCredential` instead of `.env`.
+
+See **[HACKATHON.md](HACKATHON.md)** for the rules checklist, pre-existing-work disclosure, demo script and submission text.
+
+## Licence
+
+[MIT](LICENSE). Built on the Agent-Native `chat` starter template and open-source libraries under their own licences.

@@ -1,15 +1,39 @@
-Spec Builder demo narration (voice: OpenAI tts-1 "nova")
+Spec Builder demo narration (local Kokoro TTS, voice af_heart; ~2:22)
 
-[0:00] Spec Builder. Turn a rough idea into a spec you and an agent build together.
+[0:00] Specs usually start as a messy idea. Spec Builder is an agent-native app where you and an AI agent shape that idea into a real spec, together.
 
-[0:05] Specs usually start as a messy idea in someone's notes. Spec Builder is an agent-native app where you and an AI agent shape that idea together, on the same data, through the same actions.
+[0:18] You on this page, the agent in chat, and one set of shared actions in between.
 
-[0:17] I paste a rough idea for an on-call incident app and click Generate spec. In a few seconds, real G P T 4 o mini drafts six sections: problem, target users, solution, key features, implementation steps, and risks. Every card shows who wrote it and which model.
+[0:24] I paste a rough idea and click Generate spec. GPT-4o mini drafts the whole thing.
 
-[0:34] I can override anything. Here I edit Target Users inline and save. The badge flips to written by you, version two, so my edits are never silently overwritten.
+[0:34] Six cards. Every card says who wrote it, its version, and which model.
 
-[0:44] Now I open the agent chat and ask it to tighten the Risks section and add a pricing open question. The agent calls the exact same update-section action my buttons use. There's no separate API. Watch the Risks card update live while it works.
+[0:41] Now I click the Key Features card. The UI writes my selection into application state.
 
-[1:03] The activity log shows every step, from the UI or from the agent chat, and the action it called. One define-action, shared by the UI, the agent, HTTP, M C P and the CLI. That's agent-native.
+[0:47] So I can just say, make this more specific. I never name the card. The agent reads the selection and knows what this means.
 
-[1:15] Spec Builder, built with Agent-Native. Thanks for watching.
+[1:01] It called update-section, and the card refreshed live.
+
+[1:06] History shows a diff of exactly what the agent changed.
+
+[1:13] And one click on Undo brings back the old version.
+
+[1:18] Next, Review spec. The agent critiques its own spec like a tough reviewer.
+
+[1:26] It returns typed suggestions: gaps, ambiguity, missing acceptance criteria.
+
+[1:33] I can preview the exact change first.
+
+[1:38] Accept applies it as a new, undoable version.
+
+[1:42] Reject dismisses it. The agent proposes. I decide.
+
+[1:46] I can override any card myself. My edit is badged as written by me, and never silently overwritten.
+
+[1:54] Export gives a SPEC dot M D and a task list.
+
+[1:57] The activity log shows every UI click and agent tool call, through the same actions.
+
+[2:03] Here's the downloaded spec, ready to drop into a repo or tracker.
+
+[2:10] Eleven define actions, shared by the UI, the agent, HTTP, MCP and the CLI, plus shared application state. That's agent-native. Spec Builder.
