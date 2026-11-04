@@ -4,7 +4,7 @@
 
 Built with the [Agent-Native](https://www.agent-native.com/docs/) framework for the Builder.io Agent-Native Hackathon.
 
-🎬 **Demo video:** _[Clips link, added at submission]_ · local copy: [`docs/demo.mp4`](docs/demo.mp4) (2:22)
+🎬 **Demo video:** _[https://clips.agent-native.com/r/xKH9y8Mz4F2j]_ · local copy: [`docs/demo.mp4`](docs/demo.mp4) (2:22)
 
 ![Spec Builder: selected card, live agent chat and spec cards](docs/feature-chat-selected.png)
 
